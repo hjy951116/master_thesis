@@ -43,10 +43,25 @@ def flash_no_flash(img1, img2, d, sig_col, sigma):
     result[:, :, 1] = g
     result[:, :, 2] = r
 
-    cv2.imwrite('result3.jpg', result)
+    cv2.imshow('result',result)
+    frame_diff = cv2.absdiff(cv2.cvtColor(cv2.imread(img1), cv2.COLOR_BGR2GRAY),cv2.cvtColor(result, cv2.COLOR_BGR2GRAY))
+    # cv2.imshow('framediff',frame_diff)
+    cv2.waitKey(1)
+
+    cv2.imwrite(os.path.join('/home/students/jhuang/result','%.6dr.png'%index[i]), result)
 
 if __name__ == "__main__":
-    img1 = '/home/students/jhuang/crew_A/000002.png'
-    img2 = '/home/students/jhuang/crew_B/000002.png'
-    flash_no_flash(img1,img2,3,-1,-1)
+    path1 = '/home/students/jhuang/crew_A/'
+    fileList1 = os.listdir(path1)
+    fileList1.sort()
+    path2 = '/home/students/jhuang/crew_B/'
+    fileList2 = os.listdir(path2)
+    fileList2.sort()
+    for i in range (len(index)-1):
+        img1 = path1 + os.sep + fileList1[i]
+        print(img1)
+        cv2.imshow('img1',cv2.imread(img1))
+        img2 = path2 + os.sep + fileList2[i]
+        cv2.imshow('img2',cv2.imread(img2))
+        flash_no_flash(img1,img2,9,30,-1)
 
