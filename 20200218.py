@@ -3,7 +3,10 @@ import cv2
 import os
 import csv
 import numpy as np
-from scipy import ndimage 
+from scipy import ndimage
+from numpy.lib.stride_tricks import as_strided
+from sklearn.linear_model import LinearRegression
+import math
 
 
 # rows, cols = 500, 500
@@ -88,57 +91,54 @@ ue = np.zeros((720,1280))
 ve = np.zeros((720,1280))
 
 if __name__ == "__main__":
-  filename1 = "Crew_1280x720_60Hz.yuv"
-  filename2 = "Crewwoflash_1280x720_60Hz.yuv"
-  size = (720, 1280)
-  cap1 = VideoCaptureYUV(filename1, size)
-  cap2 = VideoCaptureYUV(filename2, size)
-  count = 0
-  for n in range (100):
-    ret1, frame1 = cap1.read()
-    ret2, frame2 = cap2.read()
-    if ret1:
-      if n in index:
-        gray1 = cv2.cvtColor(frame1, cv2.COLOR_BGR2GRAY)
-        gray2 = cv2.cvtColor(frame2, cv2.COLOR_BGR2GRAY)
-        yuv1 = cv2.cvtColor(frame1, cv2.COLOR_BGR2YUV)
-        U1 = yuv1[...,1]  #0.492 * (img[...,0] - gray)
-        V1 = yuv1[...,2]  #0.877 * (img[...,2] - gray)
-        yuv2 = cv2.cvtColor(frame2, cv2.COLOR_BGR2YUV)
-        U2 = yuv2[...,1]  #0.492 * (img[...,0] - gray)
-        V2 = yuv2[...,2]  #0.877 * (img[...,2] - gray)
-        cv2.imshow('frame1',frame1)
-        cv2.imshow('frame2',frame2)
-        cv2.waitKey(1)
-        win_rows, win_cols = 3, 4
-        win_mean1[...,0] = ndimage.uniform_filter(frame1[...,0], (win_rows, win_cols))
-        win_sqr_mean1[...,0] = ndimage.uniform_filter(frame1[...,0]**2, (win_rows, win_cols))
-        win_var1[...,0] = win_sqr_mean1 - win_mean1**2
-        win_mean2[...,0] = ndimage.uniform_filter(frame2[...,0], (win_rows, win_cols))
-        win_sqr_mean2[...,0] = ndimage.uniform_filter(frame2[...,0]**2, (win_rows, win_cols))
-        win_var2[...,0] = win_sqr_mean2 - win_mean2**2
-        S[...,0] = ((frame1[...,0]-win_mean1[...,0])*(frame2[...,0]-win_mean2[...,0]))/np.square((frame1[...,0]-win_mean1[...,0]))
-        C[...,0] = win_mean1[...,0] - win_mean2[...,0]
-        print(C[...,0])
-        print(S[...,0])
-        Ref[...,0] = (frame1[...,0]-C[...,0])/S[...,0]
-        cv2.imshow('Ref',Ref)
-        cv2.waitKey(0)
-        
+    filename1 = "/home/students/jhuang/Videocoding/Crew_1280x720_60Hz.yuv"
+    filename2 = "/home/students/jhuang/Videocoding/Crewwoflash_1280x720_60Hz.yuv"
+    size = (720, 1280)
+    cap1 = VideoCaptureYUV(filename1, size)
+    cap2 = VideoCaptureYUV(filename2, size)
+    count = 0
+    for i in range (600):
+        ret1, frame1 = cap1.read()
+        ret2, frame2 = cap2.read()
+        if ret1:
+            cv2.imshow('frame1', frame1)
+            cv2.imshow('frame2', frame2)
+            if i in index:
+                print(i)
+                flash = frame1
+                noflash = frame2 
+                
+                ScaleY = np.zeros((720,1280))
+                OffsetY = np.zeros((720,1280))
+                Y1 = np.zeros((720,1280))
+                Y2 = np.zeros((720,1280))
+                # ScaleU = np.zeros((720,1280))
+                # OffsetU = np.zeros((720,1280))
 
-        # for r in range(0,gray1.shape[0]):
-        #   for c in range(0,gray1.shape[1]):
-        #     window1 = cell_neighbors(gray1, r, c, d=1)
-        #     window2 = cell_neighbors(gray2, r, c, d=1)
-        #     print(r,c)
-        #     print('-------',window1)
-        #     print('+++++++',window2)
-        #     w = np.mean(window1)
-            # i = r/windowsize_r
-            # j = c/windowsize_c
-            # blocky[i][j] = blocky[i][j] + w
-    else:
-      break
+                for m in range(0,720):
+                    for n in range(0,1280):
+                        Y1[m,n] = flash[m,n,0]
+                        Y2[m,n] = noflash[m,n,0]
+                for r in range(0,flash.shape[0]):
+                    for c in range(0,flash.shape[1]):
+                        I_flash = np.reshape(cell_neighbors(Y1, r, c, d=8),(-1,1))
+                        I_noflash = np.reshape(cell_neighbors(Y2, r, c, d=8),(-1,1))
+                        regY = LinearRegression().fit(I_flash, I_noflash)
+                        ScaleY[r,c] = regY.coef_[0]
+                        OffsetY[r,c] = regY.intercept_[0]
+                noflashcomp = noflash
+                print(ScaleY.shape)
+                print(OffsetY.shape)
+                Y2 = Y1 * ScaleY + OffsetY
+                noflashcomp[...,0] = Y2
+                # noflashcomp = cv2.cvtColor(noflashcomp, cv2.COLOR_YUV2BGR)
+                cv2.imwrite(os.path.join('/home/students/jhuang/crewwoflash2','%.6dcomp.png'%i), noflashcomp)
+
+                cv2.imshow('noflashcomp',noflashcomp)
+                cv2.waitKey(1)
+
+        else:
+            break
       
 
 
